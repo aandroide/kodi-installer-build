@@ -8,7 +8,7 @@
 #
 # Cosa fa:
 #  1. aggiunge REQUEST_INSTALL_PACKAGES al manifest
-#  2. cambia il nome pacchetto (manifest, provider, codice Java, libreria nativa)
+#  2. cambia il nome pacchetto (manifest, classi Java, libreria nativa)
 #     cosi l'APK convive con il Kodi originale
 #  3. cambia il nome mostrato nel launcher
 set -euo pipefail
@@ -42,41 +42,53 @@ if ! grep -q "REQUEST_INSTALL_PACKAGES" "$M"; then
 fi
 grep -q "REQUEST_INSTALL_PACKAGES" "$M" || { echo "Inserimento permesso fallito"; exit 1; }
 
-echo "== Nome pacchetto: $OLD_PACKAGE diventa $NEW_PACKAGE"
-# manifest: attributo package e authorities dei provider
-sed -i "s|package=\"${OLD_PACKAGE}\"|package=\"${NEW_PACKAGE}\"|" "$M"
-sed -i "s|android:authorities=\"${OLD_PACKAGE}\.|android:authorities=\"${NEW_PACKAGE}.|g" "$M"
+echo "== Nome pacchetto: $OLD_PACKAGE diventa $NEW_PACKAGE (classi comprese)"
+# La libreria nativa costruisce i nomi delle classi Java a partire dal nome del
+# pacchetto, quindi vanno rinominate anche le classi, non solo il manifest.
+OLD_PATH="${OLD_PACKAGE//./\/}"
+NEW_PATH="${NEW_PACKAGE//./\/}"
+OLD_RE="${OLD_PACKAGE//./\\.}"
+
+# manifest e risorse xml: ogni occorrenza (package, authorities, nomi classi)
+sed -i "s|${OLD_RE}|${NEW_PACKAGE}|g" "$M"
 grep -q "package=\"${NEW_PACKAGE}\"" "$M" || { echo "Cambio package fallito"; exit 1; }
+grep -rlZ "${OLD_RE}" "$D/res" 2>/dev/null | xargs -0 -r sed -i "s|${OLD_RE}|${NEW_PACKAGE}|g"
 
-# codice Java (smali): solo le stringhe che indicano il pacchetto o le authorities,
-# non i nomi delle classi
-find "$D" -type d -name 'smali*' -prune -print0 | while IFS= read -r -d '' dir; do
-  grep -rlZ --include='*.smali' "org\.xbmc\.kodi" "$dir" | xargs -0 -r sed -i \
-    -e "s|\"${OLD_PACKAGE//./\\.}\"|\"${NEW_PACKAGE}\"|g" \
-    -e "s#\"${OLD_PACKAGE//./\\.}\.file\"#\"${NEW_PACKAGE}.file\"#g" \
-    -e "s#\"${OLD_PACKAGE//./\\.}\.media\"#\"${NEW_PACKAGE}.media\"#g" \
-    -e "s#\"${OLD_PACKAGE//./\\.}\.ytdl\"#\"${NEW_PACKAGE}.ytdl\"#g" \
-    -e "s|content://${OLD_PACKAGE//./\\.}\.media|content://${NEW_PACKAGE}.media|g" \
-    -e "s|ComponentInfo{${OLD_PACKAGE//./\\.}/|ComponentInfo{${NEW_PACKAGE}/|g"
+# codice smali: sia la forma con punti sia quella con barre, poi si spostano le cartelle
+for dir in "$D"/smali*; do
+  [ -d "$dir" ] || continue
+  grep -rlZ --include='*.smali' -e "${OLD_RE}" -e "${OLD_PATH}" "$dir" | xargs -0 -r sed -i \
+    -e "s|${OLD_RE}|${NEW_PACKAGE}|g" \
+    -e "s|${OLD_PATH}|${NEW_PATH}|g"
+  if [ -d "$dir/$OLD_PATH" ]; then
+    mkdir -p "$dir/$(dirname "$NEW_PATH")"
+    mv "$dir/$OLD_PATH" "$dir/$NEW_PATH"
+  fi
 done
+if grep -rq -e "${OLD_RE}" -e "${OLD_PATH}" "$D"/smali* "$M" "$D/res" 2>/dev/null; then
+  echo "Restano riferimenti al vecchio nome:"
+  grep -rl -e "${OLD_RE}" -e "${OLD_PATH}" "$D"/smali* "$M" "$D/res" | head
+  exit 1
+fi
 
-# risorse xml che citano le authorities (ricerca globale Android TV)
-grep -rlZ "${OLD_PACKAGE//./\\.}\.media" "$D/res" 2>/dev/null | xargs -0 -r sed -i \
-  "s|${OLD_PACKAGE//./\\.}\.media|${NEW_PACKAGE}.media|g"
-
-# librerie native: stringa del pacchetto, stessa lunghezza
+# librerie native: tutte le forme del nome, stessa lunghezza
 python3 -I - "$D" "$OLD_PACKAGE" "$NEW_PACKAGE" <<'PY'
 import sys, pathlib
-root, old, new = sys.argv[1], sys.argv[2].encode(), sys.argv[3].encode()
+root, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+pairs = [(old, new), (old.replace(".", "/"), new.replace(".", "/")), (old.replace(".", "_"), new.replace(".", "_"))]
 tot = 0
 for so in pathlib.Path(root, "lib").rglob("*.so"):
     data = so.read_bytes()
-    n = data.count(old + b"\x00")
+    n = 0
+    for o, w in pairs:
+        o, w = o.encode(), w.encode()
+        n += data.count(o)
+        data = data.replace(o, w)
     if n:
-        so.write_bytes(data.replace(old + b"\x00", new + b"\x00"))
+        so.write_bytes(data)
         print(f"  {so.relative_to(root)}: {n} occorrenze")
         tot += n
-print(f"  totale stringhe native sostituite: {tot}")
+print(f"  totale sostituzioni native: {tot}")
 PY
 
 echo "== Nome app: $APP_LABEL"
