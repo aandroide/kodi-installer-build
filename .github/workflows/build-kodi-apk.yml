@@ -18,10 +18,10 @@ on:
         default: "Omega"
       new_package:
         description: "Nuovo nome pacchetto, 13 caratteri come org.xbmc.kodi"
-        default: "org.enzo.kodi"
+        default: "it.andro.kodi"
       app_label:
         description: "Nome mostrato nel launcher"
-        default: "Kodi Enzo"
+        default: "Kodi Androide"
       apk_url:
         description: "URL APK originale (vuoto = mirror ufficiale Kodi)"
         required: false
