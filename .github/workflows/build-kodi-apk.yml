@@ -16,6 +16,12 @@ on:
       codename:
         description: "Nome release (es. Omega)"
         default: "Omega"
+      new_package:
+        description: "Nuovo nome pacchetto, 13 caratteri come org.xbmc.kodi"
+        default: "org.enzo.kodi"
+      app_label:
+        description: "Nome mostrato nel launcher"
+        default: "Kodi Enzo"
       apk_url:
         description: "URL APK originale (vuoto = mirror ufficiale Kodi)"
         required: false
@@ -69,8 +75,12 @@ jobs:
             exit 1
           fi
 
-      - name: Applica il permesso
-        run: APKTOOL=apktool.jar ./patch_kodi.sh original.apk unsigned.apk
+      - name: Applica permesso e nuovo nome pacchetto
+        env:
+          APKTOOL: apktool.jar
+          NEW_PACKAGE: ${{ inputs.new_package }}
+          APP_LABEL: ${{ inputs.app_label }}
+        run: ./patch_kodi.sh original.apk unsigned.apk
 
       - name: Allinea e firma
         env:
@@ -94,6 +104,7 @@ jobs:
           "$BT/apksigner" sign --ks release.jks --ks-pass "pass:$PASS" --ks-key-alias "$ALIAS" \
             --out "kodi-${{ inputs.version }}-${{ inputs.codename }}-${{ inputs.arch }}-installer.apk" aligned.apk
           "$BT/apksigner" verify --print-certs kodi-*-installer.apk
+          "$BT/aapt2" dump badging kodi-*-installer.apk | grep -E "^package:|application-label:"
           "$BT/aapt2" dump permissions kodi-*-installer.apk | grep -i REQUEST_INSTALL_PACKAGES
 
       - uses: actions/upload-artifact@v4
@@ -106,5 +117,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: kodi-${{ inputs.version }}-${{ inputs.arch }}
-          name: Kodi ${{ inputs.version }} ${{ inputs.arch }} con installazione abilitata
+          name: ${{ inputs.app_label }} ${{ inputs.version }} ${{ inputs.arch }} (${{ inputs.new_package }})
           files: kodi-*-installer.apk
