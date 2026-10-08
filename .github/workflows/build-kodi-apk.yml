@@ -7,9 +7,10 @@ on:
         description: "Architettura"
         type: choice
         options:
-          - armeabi-v7a
+          - both
           - arm64-v8a
-        default: armeabi-v7a
+          - armeabi-v7a
+        default: both
       version:
         description: "Versione Kodi (es. 21.3)"
         default: "21.3"
@@ -22,19 +23,46 @@ on:
       app_label:
         description: "Nome mostrato nel launcher"
         default: "Kodi Androide"
+      commit_to_repo:
+        description: "Salva anche gli APK nella cartella apk/ della repo"
+        type: boolean
+        default: true
       apk_url:
-        description: "URL APK originale (vuoto = mirror ufficiale Kodi)"
+        description: "URL APK originale (solo con una singola architettura, vuoto = mirror ufficiale Kodi)"
         required: false
         default: ""
 
 permissions:
   contents: write
 
+concurrency:
+  group: kodi-build
+  cancel-in-progress: false
+
 jobs:
-  build:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      archs: ${{ steps.m.outputs.archs }}
+    steps:
+      - id: m
+        run: |
+          if [ "${{ inputs.arch }}" = "both" ]; then
+            echo 'archs=["armeabi-v7a","arm64-v8a"]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'archs=["${{ inputs.arch }}"]' >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(needs.prepare.outputs.archs) }}
     env:
       APKTOOL_VERSION: "2.10.0"
+      FINAL_APK: kodi-androide-${{ matrix.arch }}.apk
     steps:
       - uses: actions/checkout@v4
 
@@ -50,10 +78,12 @@ jobs:
 
       - name: Scarica APK originale
         run: |
-          ARCH="${{ inputs.arch }}"
+          ARCH="${{ matrix.arch }}"
           VER="${{ inputs.version }}"
           NAME="${{ inputs.codename }}"
           URL="${{ inputs.apk_url }}"
+          # con "both" l'indirizzo manuale non ha senso, si usa il mirror ufficiale
+          if [ "${{ inputs.arch }}" = "both" ]; then URL=""; fi
           if [ -z "$URL" ]; then
             if [ "$ARCH" = "armeabi-v7a" ]; then DIR="arm"; else DIR="arm64-v8a"; fi
             URL="https://mirrors.kodi.tv/releases/android/${DIR}/kodi-${VER}-${NAME}-${ARCH}.apk"
@@ -102,20 +132,53 @@ jobs:
           fi
           "$BT/zipalign" -p -f 4 unsigned.apk aligned.apk
           "$BT/apksigner" sign --ks release.jks --ks-pass "pass:$PASS" --ks-key-alias "$ALIAS" \
-            --out "kodi-${{ inputs.version }}-${{ inputs.codename }}-${{ inputs.arch }}-installer.apk" aligned.apk
-          "$BT/apksigner" verify --print-certs kodi-*-installer.apk
-          "$BT/aapt2" dump badging kodi-*-installer.apk | grep -E "^package:|application-label:"
-          "$BT/aapt2" dump permissions kodi-*-installer.apk | grep -i REQUEST_INSTALL_PACKAGES
+            --out "$FINAL_APK" aligned.apk
+          "$BT/apksigner" verify --print-certs "$FINAL_APK"
+          "$BT/aapt2" dump badging "$FINAL_APK" | grep -E "^package:|application-label:|native-code"
+          "$BT/aapt2" dump permissions "$FINAL_APK" | grep -i REQUEST_INSTALL_PACKAGES
 
       - uses: actions/upload-artifact@v4
         with:
-          name: kodi-installer-${{ inputs.arch }}
-          path: kodi-*-installer.apk
+          name: apk-${{ matrix.arch }}
+          path: ${{ env.FINAL_APK }}
           retention-days: 30
 
       - name: Pubblica nelle Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: kodi-${{ inputs.version }}-${{ inputs.arch }}
-          name: ${{ inputs.app_label }} ${{ inputs.version }} ${{ inputs.arch }} (${{ inputs.new_package }})
-          files: kodi-*-installer.apk
+          tag_name: kodi-androide-${{ matrix.arch }}
+          name: ${{ inputs.app_label }} ${{ inputs.version }} ${{ matrix.arch }}
+          body: |
+            Kodi ${{ inputs.version }} ${{ inputs.codename }} per ${{ matrix.arch }}.
+            Pacchetto: ${{ inputs.new_package }}. Permesso di installare app abilitato.
+          files: ${{ env.FINAL_APK }}
+          make_latest: false
+
+  salva_nella_repo:
+    needs: build
+    if: ${{ inputs.commit_to_repo }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: apk-*
+          path: scaricati
+          merge-multiple: true
+
+      - name: Aggiorna la cartella apk
+        run: |
+          mkdir -p apk
+          cp scaricati/*.apk apk/
+          ls -la apk
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add apk
+          if git diff --cached --quiet; then
+            echo "Nessuna modifica da salvare"
+            exit 0
+          fi
+          git commit -m "APK Kodi ${{ inputs.version }} (${{ inputs.arch }})"
+          git pull --rebase origin "${{ github.event.repository.default_branch }}"
+          git push origin "HEAD:${{ github.event.repository.default_branch }}"
