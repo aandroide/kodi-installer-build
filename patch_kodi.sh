@@ -3,8 +3,8 @@
 #
 # Variabili opzionali:
 #   APKTOOL       percorso di apktool.jar          (default: apktool.jar)
-#   NEW_PACKAGE   nuovo nome pacchetto, 13 caratteri (default: org.enzo.kodi)
-#   APP_LABEL     nome mostrato nel launcher        (default: Kodi Enzo)
+#   NEW_PACKAGE   nuovo nome pacchetto, 13 caratteri (default: it.andro.kodi)
+#   APP_LABEL     nome mostrato nel launcher        (default: Kodi Androide)
 #
 # Cosa fa:
 #  1. aggiunge REQUEST_INSTALL_PACKAGES al manifest
@@ -17,13 +17,13 @@ IN="$1"
 OUT="$2"
 APKTOOL="${APKTOOL:-apktool.jar}"
 OLD_PACKAGE="org.xbmc.kodi"
-NEW_PACKAGE="${NEW_PACKAGE:-org.enzo.kodi}"
-APP_LABEL="${APP_LABEL:-Kodi Enzo}"
+NEW_PACKAGE="${NEW_PACKAGE:-it.andro.kodi}"
+APP_LABEL="${APP_LABEL:-Kodi Androide}"
 WORK="$(mktemp -d)"
 
 # La stringa nella libreria nativa si sostituisce solo con una della stessa lunghezza
 if [ "${#NEW_PACKAGE}" -ne "${#OLD_PACKAGE}" ]; then
-  echo "NEW_PACKAGE deve avere ${#OLD_PACKAGE} caratteri come ${OLD_PACKAGE} (esempio: org.enzo.kodi)"
+  echo "NEW_PACKAGE deve avere ${#OLD_PACKAGE} caratteri come ${OLD_PACKAGE} (esempio: it.andro.kodi)"
   exit 1
 fi
 if ! [[ "$NEW_PACKAGE" =~ ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$ ]]; then
