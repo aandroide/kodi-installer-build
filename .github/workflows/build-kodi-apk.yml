@@ -52,9 +52,22 @@ jobs:
             if [ "$ARCH" = "armeabi-v7a" ]; then DIR="arm"; else DIR="arm64-v8a"; fi
             URL="https://mirrors.kodi.tv/releases/android/${DIR}/kodi-${VER}-${NAME}-${ARCH}.apk"
           fi
+          # Se e stato incollato il link della pagina kodi.tv/download/thanks,
+          # estrae l'indirizzo reale del file dal parametro url=
+          case "$URL" in
+            *download/thanks*)
+              URL="$(python3 -c 'import sys,urllib.parse as u; q=u.parse_qs(u.urlparse(sys.argv[1]).query); print(q["url"][0].split("?")[0])' "$URL")"
+              ;;
+          esac
           echo "Scarico $URL"
-          curl -fL --retry 3 -o original.apk "$URL"
+          curl -fL --retry 3 -A "Mozilla/5.0" -o original.apk "$URL"
           ls -la original.apk
+          # Controlla che sia un vero APK (un file zip) e non una pagina HTML
+          if ! unzip -tq original.apk >/dev/null 2>&1; then
+            echo "Il file scaricato non e un APK valido. Controlla l'indirizzo."
+            head -c 300 original.apk
+            exit 1
+          fi
 
       - name: Applica il permesso
         run: APKTOOL=apktool.jar ./patch_kodi.sh original.apk unsigned.apk
