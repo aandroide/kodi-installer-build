@@ -201,9 +201,10 @@ def update_now(build):
 
 # ---------------------------------------------------------------- controllo
 
-def check(manual=False):
+def check(manual=False, startup=False):
     """Controlla se c'e una versione nuova. Con manual=False non mostra nulla se non c'e
-    niente da fare. Ritorna True se ha proposto o avviato un aggiornamento."""
+    niente da fare. Con startup=True (controllo all'avvio di Kodi) propone l'aggiornamento
+    ogni volta che Kodi viene riaperto, anche dopo un 'Piu tardi'. Ritorna True se ha proposto o avviato un aggiornamento."""
     dialog = xbmcgui.Dialog()
     if not is_android():
         if manual:
@@ -249,7 +250,7 @@ def check(manual=False):
             dialog.ok(TITLE, 'Kodi e gia aggiornato, versione %s.' % core.format_version(local))
         return False
 
-    if not manual and not core.should_remind(state, build['version'], time.time(), REMIND_EVERY):
+    if not manual and not startup and not core.should_remind(state, build['version'], time.time(), REMIND_EVERY):
         return False
 
     megabytes = int(build.get('size') or 0) // 1048576
