@@ -39,3 +39,10 @@ Il controllo funziona solo con il Kodi Androide, firmato sempre con la stessa ch
 Il workflow ha l'opzione `bundle_addons` (attiva di default): gli addon nella cartella `addon/` della repo
 (oggi `script.kodiandroide.updater`) vengono inseriti dentro l'APK come addon di sistema disattivabili.
 Quindi non serve più installare lo zip a mano. Per aggiornare l'addon incluso bisogna rigenerare l'APK.
+
+## Avviso quando esce una nuova versione di Kodi
+
+Il workflow "Controlla nuova versione di Kodi" gira ogni giorno e confronta l'ultima versione stabile di Kodi
+con quella in `apk/version.json`. Se Kodi e piu avanti apre una segnalazione (issue) nella repo e GitHub ti avvisa
+con la notifica dell'app e con la mail del tuo account. Non costruisce nulla da solo: la build la lanci tu.
+Per provarlo: Actions, "Controlla nuova versione di Kodi", Run workflow, campo prova con per esempio `99.0-Prova`.

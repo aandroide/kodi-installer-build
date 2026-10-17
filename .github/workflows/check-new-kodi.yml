@@ -1,0 +1,101 @@
+name: Controlla nuova versione di Kodi
+
+# Ogni giorno guarda se Kodi ha pubblicato una versione stabile piu alta di quella in
+# apk/version.json. Se si, apre una segnalazione (issue) nella repo: GitHub ti avvisa con
+# la notifica dell'app e con la mail del tuo account, senza scrivere nessun indirizzo qui.
+# Non costruisce e non pubblica nulla: la build la lanci tu da "Build Kodi APK".
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+    inputs:
+      finta_versione:
+        description: "Solo per prova: simula l'uscita di questa versione (es. 21.4-Omega)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  controlla:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cerca l'ultima versione stabile di Kodi
+        id: kodi
+        env:
+          FINTA: ${{ inputs.finta_versione }}
+        run: |
+          set -euo pipefail
+          if [ -n "${FINTA:-}" ]; then
+            LATEST_TAG="$FINTA"
+          else
+            # solo tag stabili tipo 21.3-Omega, niente alpha, beta o rc
+            LATEST_TAG="$(git ls-remote --tags --refs https://github.com/xbmc/xbmc.git \
+              | sed 's#.*refs/tags/##' \
+              | grep -E '^[0-9]+\.[0-9]+-[A-Za-z]+$' | sort -V | tail -1)"
+          fi
+          [ -n "$LATEST_TAG" ] || { echo "Nessuna versione trovata"; exit 1; }
+          VER="${LATEST_TAG%%-*}"
+          NAME="${LATEST_TAG#*-}"
+
+          CURRENT="$(jq -r '(.builds["arm64-v8a"].version // ([.builds[].version] | first))' apk/version.json)"
+          [ -n "$CURRENT" ] && [ "$CURRENT" != "null" ] || { echo "version.json non leggibile"; exit 1; }
+
+          NEWER=false
+          if [ "$CURRENT" != "$VER" ] && [ "$(printf '%s\n%s\n' "$CURRENT" "$VER" | sort -V | tail -1)" = "$VER" ]; then
+            NEWER=true
+          fi
+
+          # informativo: l'APK e gia sul mirror ufficiale?
+          CODE="$(curl -s -o /dev/null -m 30 -I -L -w '%{http_code}' \
+            "https://mirrors.kodi.tv/releases/android/arm64-v8a/kodi-${VER}-${NAME}-arm64-v8a.apk" || true)"
+
+          echo "Kodi stabile piu recente: $VER ($NAME). Nel tuo mod: $CURRENT. Nuova: $NEWER. Mirror: $CODE"
+          {
+            echo "ver=$VER"; echo "name=$NAME"; echo "current=$CURRENT"
+            echo "newer=$NEWER"; echo "mirror=$CODE"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Apri la segnalazione se c'e una versione nuova
+        if: steps.kodi.outputs.newer == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VER: ${{ steps.kodi.outputs.ver }}
+          NAME: ${{ steps.kodi.outputs.name }}
+          CURRENT: ${{ steps.kodi.outputs.current }}
+          MIRROR: ${{ steps.kodi.outputs.mirror }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TITLE="Nuova versione di Kodi: $VER ($NAME)"
+          FOUND="$(gh issue list --repo "$REPO" --state all --search "\"$TITLE\" in:title" --json title --jq "[.[] | select(.title == \"$TITLE\")] | length")"
+          if [ "$FOUND" != "0" ]; then
+            echo "Segnalazione gia aperta per $VER, non ne creo un'altra."
+            exit 0
+          fi
+
+          if [ "$MIRROR" = "200" ]; then
+            MIRROR_TXT="L'APK ufficiale e gia disponibile sul mirror di Kodi."
+          else
+            MIRROR_TXT="L'APK ufficiale potrebbe non essere ancora sul mirror di Kodi (risposta $MIRROR). Se la build fallisce al download, riprova tra qualche ora."
+          fi
+
+          cat > body.md <<BODY
+          @$OWNER e uscito Kodi **$VER** ($NAME). Il tuo Kodi Androide e fermo alla **$CURRENT**.
+
+          $MIRROR_TXT
+
+          Per aggiornarlo:
+          1. Apri https://github.com/$REPO/actions/workflows/build-kodi-apk.yml
+          2. Premi **Run workflow**, scegli arch **both**, versione **$VER**, nome release **$NAME**.
+          3. Finita la build, i tuoi dispositivi ricevono l'avviso all'avvio di Kodi.
+
+          Prima di pubblicare conviene leggere le novita di Kodi: una major nuova puo rompere la modifica.
+          BODY
+          gh issue create --repo "$REPO" --title "$TITLE" --body-file body.md
