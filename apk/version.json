@@ -2,15 +2,15 @@
   "builds": {
     "arm64-v8a": {
       "file": "kodi-androide-arm64-v8a.apk",
-      "sha256": "54de0318386a11df25b3215c4dd3f0095395e1c2819702ff5ab01a9c5c0b5f45",
-      "size": 68225432,
+      "sha256": "88a045d4f31d3697c66274b29d33e13bef452a5cf56d66009130652354d75a28",
+      "size": 68229528,
       "url": "https://github.com/aandroide/kodi-installer-build/releases/download/kodi-androide-arm64-v8a/kodi-androide-arm64-v8a.apk",
       "version": "21.3",
       "version_code": 2103000
     },
     "armeabi-v7a": {
       "file": "kodi-androide-armeabi-v7a.apk",
-      "sha256": "e2cc98b13855b41b8e5b26886269a3ee8e06e9c45988214bff4eab1037c98656",
+      "sha256": "c942b5d7ace0f199470f8b2891eefae390994688831e2f50023dd2ff6f56eb46",
       "size": 67893744,
       "url": "https://github.com/aandroide/kodi-installer-build/releases/download/kodi-androide-armeabi-v7a/kodi-androide-armeabi-v7a.apk",
       "version": "21.3",
@@ -18,5 +18,5 @@
     }
   },
   "package": "it.andro.kodi",
-  "updated": "2026-10-17T08:33:33Z"
+  "updated": "2026-10-17T09:23:11Z"
 }
