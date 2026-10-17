@@ -90,7 +90,10 @@ def manifest_url():
 
 
 def fetch_manifest():
-    request = Request(manifest_url(), headers={'User-Agent': UA, 'Cache-Control': 'no-cache'})
+    url = manifest_url()
+    # il parametro cambia a ogni richiesta, cosi GitHub non serve una copia vecchia in cache
+    url += ('&' if '?' in url else '?') + 't=%d' % int(time.time())
+    request = Request(url, headers={'User-Agent': UA, 'Cache-Control': 'no-cache'})
     with urlopen(request, timeout=20) as response:
         return json.loads(response.read().decode('utf-8'))
 
@@ -164,7 +167,10 @@ def download_apk(build):
     progress.close()
 
     if size and os.path.getsize(dest) != size:
-        dialog.ok(TITLE, 'Il file scaricato e incompleto. Riprova piu tardi.')
+        got = os.path.getsize(dest)
+        log('Dimensione scaricata %d, attesa %d' % (got, size))
+        dialog.ok(TITLE, 'Il file scaricato non ha la dimensione attesa (%d byte invece di %d). '
+                         'Riprova tra qualche minuto.' % (got, size))
         _clean_dir(folder)
         return None
     expected = str(build.get('sha256') or '').lower()
