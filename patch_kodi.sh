@@ -5,12 +5,15 @@
 #   APKTOOL       percorso di apktool.jar          (default: apktool.jar)
 #   NEW_PACKAGE   nuovo nome pacchetto, 13 caratteri (default: it.andro.kodi)
 #   APP_LABEL     nome mostrato nel launcher        (default: Kodi Androide)
+#   BUNDLE_ADDONS_DIR  cartella con gli addon da includere nell'APK (vuoto = nessuno)
 #
 # Cosa fa:
 #  1. aggiunge REQUEST_INSTALL_PACKAGES al manifest
 #  2. cambia il nome pacchetto (manifest, classi Java, libreria nativa)
 #     cosi l'APK convive con il Kodi originale
 #  3. cambia il nome mostrato nel launcher
+#  4. include nell'APK gli addon della cartella BUNDLE_ADDONS_DIR, registrandoli
+#     come addon di sistema disattivabili (come service.xbmc.versioncheck)
 set -euo pipefail
 
 IN="$1"
@@ -95,6 +98,26 @@ echo "== Nome app: $APP_LABEL"
 for f in "$D"/res/values*/strings.xml; do
   sed -i "s|<string name=\"app_name\">Kodi</string>|<string name=\"app_name\">${APP_LABEL}</string>|" "$f"
 done
+
+BUNDLE_DIR="${BUNDLE_ADDONS_DIR:-}"
+if [ -n "$BUNDLE_DIR" ] && [ -d "$BUNDLE_DIR" ]; then
+  echo "== Addon inclusi nell'APK da $BUNDLE_DIR"
+  MANIFEST_ADDONS="$D/assets/system/addon-manifest.xml"
+  [ -f "$MANIFEST_ADDONS" ] || { echo "addon-manifest.xml non trovato nell'APK"; exit 1; }
+  for addon in "$BUNDLE_DIR"/*/; do
+    [ -f "${addon}addon.xml" ] || continue
+    id="$(basename "$addon")"
+    rm -rf "$D/assets/addons/$id"
+    cp -r "${addon%/}" "$D/assets/addons/$id"
+    find "$D/assets/addons/$id" -name '__pycache__' -prune -exec rm -rf {} +
+    if ! grep -q ">${id}<" "$MANIFEST_ADDONS"; then
+      sed -i "s#</addons>#  <addon optional=\"true\">${id}</addon>\n</addons>#" "$MANIFEST_ADDONS"
+    fi
+    grep -q ">${id}<" "$MANIFEST_ADDONS" || { echo "Registrazione di $id fallita"; exit 1; }
+    [ -f "$D/assets/addons/$id/addon.xml" ] || { echo "Copia di $id fallita"; exit 1; }
+    echo "  incluso: $id"
+  done
+fi
 
 echo "== Ricompilazione"
 java -jar "$APKTOOL" b "$D" -o "$OUT"

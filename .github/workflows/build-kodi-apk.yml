@@ -23,6 +23,10 @@ on:
       app_label:
         description: "Nome mostrato nel launcher"
         default: "Kodi Androide"
+      bundle_addons:
+        description: "Includi nell'APK gli addon della cartella addon/ della repo"
+        type: boolean
+        default: true
       commit_to_repo:
         description: "Salva anche gli APK nella cartella apk/ della repo"
         type: boolean
@@ -110,6 +114,7 @@ jobs:
           APKTOOL: apktool.jar
           NEW_PACKAGE: ${{ inputs.new_package }}
           APP_LABEL: ${{ inputs.app_label }}
+          BUNDLE_ADDONS_DIR: ${{ inputs.bundle_addons && 'addon' || '' }}
         run: ./patch_kodi.sh original.apk unsigned.apk
 
       - name: Allinea e firma

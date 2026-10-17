@@ -33,3 +33,9 @@ ne controlla l'impronta e avvia l'installazione. Android chiede sempre una confe
 Per pubblicare una versione nuova di Kodi basta rilanciare il workflow indicando la nuova
 versione, con l'opzione "Salva anche gli APK nella cartella apk/" attiva.
 Il controllo funziona solo con il Kodi Androide, firmato sempre con la stessa chiave.
+
+## Addon incluso nell'APK
+
+Il workflow ha l'opzione `bundle_addons` (attiva di default): gli addon nella cartella `addon/` della repo
+(oggi `script.kodiandroide.updater`) vengono inseriti dentro l'APK come addon di sistema disattivabili.
+Quindi non serve più installare lo zip a mano. Per aggiornare l'addon incluso bisogna rigenerare l'APK.
