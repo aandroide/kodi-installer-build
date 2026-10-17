@@ -22,3 +22,14 @@ che viene aggiornata a ogni build, quindi gli indirizzi di download non cambiano
 Per firmare sempre con la stessa chiave aggiungi nei segreti della repo
 `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD` e `KEY_ALIAS`. Senza, ogni build usa una chiave nuova
 e un APK non si installa sopra quello precedente: va prima disinstallato.
+
+## Aggiornamenti automatici
+
+A ogni build la action scrive `apk/version.json` con versione, indirizzo, dimensione e impronta
+sha256 di ogni architettura. L'addon `addon/script.kodiandroide.updater` lo legge, confronta la
+versione di Kodi in esecuzione con l'ultima pubblicata e, se serve, scarica l'APK giusto,
+ne controlla l'impronta e avvia l'installazione. Android chiede sempre una conferma.
+
+Per pubblicare una versione nuova di Kodi basta rilanciare il workflow indicando la nuova
+versione, con l'opzione "Salva anche gli APK nella cartella apk/" attiva.
+Il controllo funziona solo con il Kodi Androide, firmato sempre con la stessa chiave.

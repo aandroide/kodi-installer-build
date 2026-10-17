@@ -137,10 +137,43 @@ jobs:
           "$BT/aapt2" dump badging "$FINAL_APK" | grep -E "^package:|application-label:|native-code"
           "$BT/aapt2" dump permissions "$FINAL_APK" | grep -i REQUEST_INSTALL_PACKAGES
 
+      - name: Dati per version.json
+        env:
+          ARCH: ${{ matrix.arch }}
+          KODI_VERSION: ${{ inputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          VCODE="$("$BT/aapt2" dump badging "$FINAL_APK" | sed -n "s/^package: .*versionCode='\([0-9]*\)'.*/\1/p")"
+          echo "versionCode: $VCODE"
+          python3 - "$FINAL_APK" "$VCODE" <<'PY'
+          import hashlib, json, os, sys
+          apk, vcode = sys.argv[1], sys.argv[2]
+          arch = os.environ["ARCH"]
+          sha = hashlib.sha256()
+          with open(apk, "rb") as f:
+              for chunk in iter(lambda: f.read(1 << 20), b""):
+                  sha.update(chunk)
+          meta = {
+              "arch": arch,
+              "version": os.environ["KODI_VERSION"],
+              "version_code": int(vcode or 0),
+              "file": apk,
+              "url": "https://github.com/%s/releases/download/kodi-androide-%s/%s" % (os.environ["REPO"], arch, apk),
+              "sha256": sha.hexdigest(),
+              "size": os.path.getsize(apk),
+          }
+          with open("meta-%s.json" % arch, "w") as f:
+              json.dump(meta, f, indent=2)
+          print(json.dumps(meta, indent=2))
+          PY
+
       - uses: actions/upload-artifact@v4
         with:
           name: apk-${{ matrix.arch }}
-          path: ${{ env.FINAL_APK }}
+          path: |
+            ${{ env.FINAL_APK }}
+            meta-${{ matrix.arch }}.json
           retention-days: 30
 
       - name: Pubblica nelle Release
@@ -168,9 +201,33 @@ jobs:
           merge-multiple: true
 
       - name: Aggiorna la cartella apk
+        env:
+          PKG: ${{ inputs.new_package }}
         run: |
           mkdir -p apk
           cp scaricati/*.apk apk/
+          python3 - <<'PY'
+          import datetime, glob, json, os
+          path = "apk/version.json"
+          data = {}
+          if os.path.exists(path):
+              try:
+                  with open(path) as f:
+                      data = json.load(f)
+              except Exception:
+                  data = {}
+          data["package"] = os.environ["PKG"]
+          builds = data.setdefault("builds", {})
+          for name in glob.glob("scaricati/meta-*.json"):
+              with open(name) as f:
+                  meta = json.load(f)
+              builds[meta.pop("arch")] = meta
+          data["updated"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          with open(path, "w") as f:
+              json.dump(data, f, indent=2, sort_keys=True)
+              f.write("\n")
+          print(json.dumps(data, indent=2, sort_keys=True))
+          PY
           ls -la apk
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"

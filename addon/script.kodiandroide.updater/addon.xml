@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="script.kodiandroide.updater" name="Kodi Androide Updater" version="1.0.0" provider-name="Androide">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0"/>
+  </requires>
+  <extension point="xbmc.python.script" library="default.py">
+    <provides>executable</provides>
+  </extension>
+  <extension point="xbmc.service" library="service.py" start="login"/>
+  <extension point="xbmc.addon.metadata">
+    <platform>android</platform>
+    <summary lang="it_IT">Aggiorna Kodi Androide da GitHub</summary>
+    <summary lang="en_GB">Updates Kodi Androide from GitHub</summary>
+    <description lang="it_IT">Controlla se esiste una versione nuova di Kodi Androide, la scarica, verifica il file e avvia l'installazione. Serve il Kodi Androide con il permesso di installare app. Android chiede sempre una conferma prima di aggiornare.</description>
+    <description lang="en_GB">Checks for a newer Kodi Androide build, downloads it, verifies the file and starts the Android installer. Requires the Kodi Androide build with the install apps permission.</description>
+    <license>GPL-2.0-or-later</license>
+  </extension>
+</addon>

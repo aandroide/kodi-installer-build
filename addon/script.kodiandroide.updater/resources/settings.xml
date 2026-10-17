@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<settings>
+    <category label="Aggiornamenti">
+        <setting id="auto_check" type="bool" label="Controlla gli aggiornamenti all'avvio di Kodi" default="true"/>
+        <setting id="version_url" type="text" label="Indirizzo del file version.json" default="https://raw.githubusercontent.com/aandroide/kodi-installer-build/master/apk/version.json"/>
+        <setting id="check_now" type="action" label="Controlla aggiornamenti adesso" action="RunScript(script.kodiandroide.updater)" option="close"/>
+    </category>
+</settings>
