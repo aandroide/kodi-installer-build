@@ -25,7 +25,7 @@ ADDON_ID = ADDON.getAddonInfo('id')
 TITLE = ADDON.getAddonInfo('name')
 UA = 'Mozilla/5.0 (Linux; Android 14) KodiAndroideUpdater'
 
-CHECK_EVERY = 24 * 3600
+CHECK_EVERY = 3600
 REMIND_EVERY = 3 * 24 * 3600
 
 
